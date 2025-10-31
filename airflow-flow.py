@@ -9,7 +9,7 @@ from airflow.operators.python import PythonOperator
 from airflow.models import Variable 
 from airflow.decorators import dag, task
 
-
+#Set default arguments
 default_args = {
     'owner': 'airflow',
     'depends_on_past': False,
@@ -20,7 +20,7 @@ default_args = {
     'retry_delay': timedelta(minutes=5),
 }
 
-# Create DAG
+#Create DAG
 dag = DAG(
     'message_assembler_data_pipeline',
     default_args=default_args,
@@ -31,6 +31,7 @@ dag = DAG(
 
 @task()
 def fetch_url():
+    #First task to get url for sqs queue
     url = "https://j9y2xa0vx0.execute-api.us-east-1.amazonaws.com/api/scatter/mge9dn"
     payload = requests.post(url).json() #use requests to call https post 
     queue_url = payload['sqs_url']
@@ -38,12 +39,13 @@ def fetch_url():
 
 @task()
 def collect_messages(queue_url):
-    #Task flow that checks for available messages and checks if available 
+    #Task flow that checks for available messages and checks if available
+    #Contains functions for smaller parts of task 
     def get_queue_attributes(queue_url):
         #Gets attributes from queue and returns how many messages are available and how many are delayed
         try:
             sqs = boto3.client('sqs', region_name='us-east-1',
-                aws_access_key_id=Variable.get("AWS_ACCESS_KEY_ID"),
+                aws_access_key_id=Variable.get("AWS_ACCESS_KEY_ID"), #get variables from airflow
                 aws_secret_access_key=Variable.get("AWS_SECRET_ACCESS_KEY"))
             response = sqs.get_queue_attributes( #use sqs to get attributes 
                 QueueUrl=queue_url,
@@ -168,6 +170,7 @@ def send_solution(uvaid, phrase, platform):
         raise e
     
 with dag:
+    #With statement to add tasks to dag in order to create dependencies
     queue_url = fetch_url()
     messages = collect_messages(queue_url)
     phrase = sort_messages(messages)
